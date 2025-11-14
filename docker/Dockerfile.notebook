@@ -1,0 +1,94 @@
+
+FROM quay.io/jupyter/scipy-notebook:python-3.12
+
+# Switch to root to install system packages
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential gfortran \
+    && rm -rf /var/lib/apt/lists/*
+
+
+RUN pip install --no-cache-dir xarray netCDF4 scipy oceanum oceanumlab wavespectra
+
+RUN git clone https://github.com/rom-py/perth-demo-2025.git /home/jovyan/perth-demo &&\
+    cd /home/jovyan/perth-demo &&\
+    pip install -r requirements.txt
+
+
+
+# Istall SWAN
+# Using latest SWAN from Git - no version pinning needed
+ENV BUILD_DIR=/tmp/build
+ENV INSTALL_DIR=/usr/local
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN echo "-------------------- Install system libraries --------------------" && \
+    apt update && apt install -y --no-install-recommends \
+        autoconf \
+        automake \
+        ca-certificates \
+        cmake \
+        make \
+        gcc \
+        gfortran \
+        git \
+        g++ \
+        libhdf5-dev \
+        libnetcdf-dev \
+        libnetcdff-dev \
+        libopenmpi-dev \
+        ninja-build \
+        openmpi-bin \
+        patch \
+        wget \
+        neovim \
+        zlib1g-dev && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
+
+
+#==========================================
+# Model build dependencies
+#==========================================
+
+# Using pre-installed packages for OpenMPI, HDF5, and NetCDF instead of building from source
+
+
+#==========================================
+# Model build
+#==========================================
+# Using the latest SWAN source and build system from the official GitLab repository.
+# This provides the most up-to-date CMake build configuration and source code.
+
+RUN echo "-------------------- Build SWAN --------------------" && \
+    mkdir -p $BUILD_DIR && \
+    cd $BUILD_DIR && \
+    git clone --depth 1 https://gitlab.tudelft.nl/citg/wavemodels/swan.git && \
+    cd swan && \
+    mkdir build && \
+    cd build && \
+    cmake .. -DNETCDF=ON -DMPI=OFF && \
+    make VERBOSE=1 && \
+    echo "=== Build directory contents ===" && \
+    find . -type f -executable | head -20 && \
+    echo "=== Looking for SWAN executables ===" && \
+    find . -name "*swan*" -type f && \
+    echo "=== Looking for any executables ===" && \
+    find . -type f -perm /u+x | grep -v "\.so" | head -10 && \
+    echo "=== Trying to install manually ===" && \
+    find . -name "*swan*" -type f -executable -exec cp {} $INSTALL_DIR/bin/ \; && \
+    echo "=== Final installed files ===" && \
+    ls -la $INSTALL_DIR/bin/ && \
+    cd ../../ && \
+    rm -rf $BUILD_DIR/swan
+
+
+# Skip the built-in test for now - will be handled by the container test
+
+
+RUN cd && rm -rf $BUILD_DIR
+
+
+
+# Return to the jovyan user for normal operation
+USER ${NB_UID}

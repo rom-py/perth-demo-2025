@@ -1,0 +1,18 @@
+# DataMesh backend configuration example
+# This configuration registers model outputs with Oceanum's DataMesh system
+
+type: datamesh
+base_url: "https://datamesh.oceanum.io"
+token: "${DATAMESH_TOKEN}"  # Use environment variable for security
+dataset_name: "rompy-model-output"
+tags:
+  - "rompy"
+  - "model"
+  - "hindcast"
+  - "oceanum"
+metadata:
+  description: "Model outputs from rompy processing"
+  author: "Model User"
+  project: "Coastal Modeling"
+  model_version: "1.0.0"
+  processing_timestamp: "${TIMESTAMP:-$(date -Iseconds)}"
