@@ -165,7 +165,7 @@ def my_fancy_interpolation(
 
 
 # %%
-DATADIR = Path("../../tests/data")
+DATADIR = Path("../tests/data")
 display(sorted(DATADIR.glob("*")))
 
 gebco_file = DATADIR / "gebco-1deg.nc"
@@ -779,7 +779,7 @@ command = f"swan.exe"
 docker_config = DockerConfig(
     # Docker build configuration
     dockerfile=Path("Dockerfile"),  # Dockerfile for SCHISM build
-    build_context=Path("../../../rompy-swan/main/docker"),  # Build context directory
+    build_context=Path("../docker"),  # Build context directory
     # Resource limits and timeouts
     timeout=3600,  # 1 hour execution timeout
     cpu=8,  # Number of CPU cores
