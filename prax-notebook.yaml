@@ -4,8 +4,8 @@ resources:
     - name: rompy-demo
       description: A demo notebook for Rompy for Wave Symposium
       resources:
-        cpu: 1
-        memory: 1G
+        cpu: 2
+        memory: 4G
       image: "us-central1-docker.pkg.dev/oceanum-prod/prax-user-oceanum/perth-demo:v0.1.1"
 
   stages:
