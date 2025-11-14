@@ -5,7 +5,7 @@ This is an interactive demo of how to use the code in this repository
 ## 1. Clone the repository and setup a virtual environment
 
 ```bash
-git clone git@github.com:rom-py/perth-demo-2025.git perth-demo
+git clone https://github.com/rom-py/perth-demo-2025.git perth-demo
 cd perth-demo
 python -m venv venv
 source venv/bin/activate
