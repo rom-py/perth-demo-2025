@@ -1,0 +1,189 @@
+# Deonstration of a SWAN model configuration using Datamesh data sources.
+# This configuration sets up a SWAN simulation for the SWWA region,
+# utilizing bathymetry from the GEBCO dataset and wind forcing from ERA5.
+#
+
+run_id: swwa_swan_forecast
+config:
+  model_type: swanconfig
+  startup:
+    project:
+      model_type: project
+      name: swwa
+      nr: run1
+      title1: Generated basic SWAN configuration
+    set:
+      model_type: set
+      level: 0.0
+      depmin: 0.05
+      direction_convention: nautical
+    mode:
+      model_type: mode
+      kind: nonstationary
+      dim: twodimensional
+    coordinates:
+      model_type: coordinates
+      kind:
+        model_type: spherical
+  cgrid:
+    model_type: regular
+    spectrum:
+      mdc: 36
+      flow: 0.04
+      fhigh: 1.0
+    grid:
+      xp: 110.0
+      yp: -35.2
+      alp: 4.0
+      xlen: 7.5
+      ylen: 12.5
+      mx: 14
+      my: 24
+  inpgrid:
+    model_type: data_interface
+    bottom:
+      var: bottom
+      source:
+        model_type: datamesh
+        # datasource: our-changing-coast-gebco_1_degree_for_testing
+        datasource: gebco_2025
+        token: null
+      fac: -1.0
+      buffer: 1.0
+      z1: elevation
+      coords:
+        x: lon
+        y: lat
+    input:
+      - var: wind
+        source:
+          model_type: datamesh
+          datasource: gfs_wind10m_0p25
+          token: null
+        buffer: 2.0
+        filter:
+          sort:
+            coords:
+              - lat
+        z1: ugrd10m
+        z2: vgrd10m
+        coords:
+          x: lon
+          y: lat
+  boundary:
+    model_type: boundary_interface
+    kind:
+      model_type: boundnest1
+      id: ww3_glob
+      source:
+        model_type: datamesh
+        datasource: oceanum_wave_glob05_gfs_spec
+        token: null
+      sel_method: idw
+  initial:
+    kind:
+      model_type: default
+  physics:
+    gen:
+      model_type: gen3
+      source_terms:
+        model_type: westhuysen
+    quadrupl:
+      iquad: 2
+    breaking:
+      model_type: constant
+      gamma: 0.73
+    friction:
+      model_type: madsen
+      kn: 0.05
+    triad:
+      model_type: triad
+  prop:
+    scheme:
+      model_type: bsbt
+  numeric:
+    stop:
+      model_type: stopc
+      dabs: 0.05
+      drel: 0.05
+      curvat: 0.05
+      npnts: 95
+      mode:
+        model_type: nonstat
+        mxitns: 3
+  output:
+    points:
+      model_type: points
+      sname: pts
+      xp:
+        - 112.1
+        - 114.9
+      yp:
+        - -31.540000000000003
+        - -26.660000000000004
+    quantity:
+      model_type: quantities
+      quantities:
+        - output:
+            - depth
+            - hsign
+            - tps
+            - dir
+            - tm01
+          excv: -9
+        - output:
+            - hswell
+          fswell: 0.125
+    block:
+      model_type: block
+      sname: COMPGRID
+      fname: swangrid.nc
+      output:
+        - depth
+        - wind
+        - hsign
+        - tps
+        - dir
+      times:
+        dfmt: hr
+    table:
+      sname: pts
+      format: header
+      fname: swantable.txt
+      output:
+        - time
+        - hsign
+        - hswell
+        - dir
+        - tps
+        - tm01
+      times:
+        dfmt: hr
+    specout:
+      sname: pts
+      fname: swanspec.nc
+      dim:
+        model_type: spec2d
+      freq:
+        model_type: abs
+      times:
+        dfmt: hr
+  lockup:
+    compute:
+      model_type: nonstat
+      initstat: true
+      times:
+        model_type: nonstationary
+        tfmt: 1
+        dfmt: hr
+      hotfile:
+        fname: hotfile.txt
+        format: free
+      hottimes:
+        - -1
+period:
+  start: 20251115T000000
+  duration: 5d
+  interval: 1h
+output_dir: simulations
+run_id_subdir: true
