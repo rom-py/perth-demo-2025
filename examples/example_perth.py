@@ -87,7 +87,7 @@ def plot_spectra(spectra, grid=None, markersize=6, ax=None):
             figsize=(10, 5), subplot_kw={"projection": ccrs.PlateCarree()}
         )
     else:
-        plt.gcf().sca(ax)
+        ax =plt.gcf().sca(ax)
     if grid:
         grid.plot(ax=ax)
     c = ds.isel(time=[0]).spec.hs()
@@ -107,6 +107,33 @@ def plot_spectra(spectra, grid=None, markersize=6, ax=None):
     ax.grid(True)
     return ax
 
+def print_new_contents(path, old_contents=None):
+    """
+    Helper function to display directory contents and highlight new files.
+
+    Parameters:
+    -----------
+    path : Path
+        Directory path to inspect
+    old_contents : set, optional
+        Previously existing file names for comparison
+
+    Returns:
+    --------
+    set : Set of current file names in the directory
+    """
+    print(f"\nContents of {path}:")
+    for item in path.iterdir():
+        if item.is_dir():
+            print(f" - {item.name}/")
+            print_new_contents(item, old_contents=old_contents)
+        if old_contents is None or item.name not in old_contents:
+            print(f" - {item.name} (new)")
+        else:
+            print(f" - {item.name}")
+    return set(item.name for item in path.iterdir())
+
+    
 
 # %% [markdown]
 # ## Workspace basepath
@@ -115,6 +142,8 @@ def plot_spectra(spectra, grid=None, markersize=6, ax=None):
 workdir = Path("example_procedural")
 shutil.rmtree(workdir, ignore_errors=True)
 workdir.mkdir()
+# Initialize workspace contents tracking
+contents = print_new_contents(workdir)
 
 # %% [markdown]
 # ## Model Grid
@@ -209,9 +238,10 @@ bottom = SwanDataGrid(
     z1="elevation",
     fac=-1,
     coords={"x": "lon", "y": "lat"},
-    crop_data=False,  # So data isn't cropped to model grid inside SwanConfig
+    crop_data=True,  # So data isn't cropped to model grid inside SwanConfig
+    buffer=2
 )
-
+bottom.get(grid=grid, destdir=workdir)
 fig, ax = bottom.plot(
     param="elevation", vmin=-5000, vmax=0, cmap="turbo_r", figsize=(5, 6)
 )
@@ -249,9 +279,12 @@ wind = SwanDataGrid(
     z1="u10",
     z2="v10",
     coords={"x": "longitude", "y": "latitude"},
-    crop_data=False,  # So data isn't cropped to model grid inside SwanConfig
+    crop_data=True,  # So data isn't cropped to model grid inside SwanConfig
     filter=Filter(sort=dict(coords=["latitude"])),
+    buffer=2
 )
+
+wind.get(grid=grid, destdir=workdir)
 
 fig, ax = wind.plot(
     param="u10", isel={"time": 0}, vmin=-5, vmax=5, cmap="RdBu_r", figsize=(5, 6)
@@ -292,33 +325,14 @@ ds = read_swan(outfile)
 display(ds)
 
 # Plot the boundary data alongside the source dataset and the model grid
-fig, ax = plt.subplots(figsize=(10, 5), subplot_kw={"projection": projection})
 
-
-# # Source dataset
-# c = oceanum.isel(time=[0]).spec.hs()
-# p = ax.scatter(
-#     oceanum.lon, oceanum.lat, s=20, c=c, marker="v", cmap="turbo", vmin=0, vmax=4
-# )
-
+# Original
 ax = plot_spectra(spectra_file, grid=grid, markersize=20)
+
+# Interpolated to boundary
 plot_spectra(ds, grid=grid, markersize=50, ax=ax)
 
-# # Generated boundary dataset
-# c = ds.isel(time=[0]).spec.hs()
-# p = ax.scatter(
-#     ds.lon, ds.lat, s=50, c=c, cmap="turbo", edgecolors="0.5", vmin=0, vmax=4
-# )
-#
-# # Model grid
-# grid.plot(ax=ax)
 
-# # Axis settings
-# ax.set_title(c.time.to_index().to_pydatetime()[0])
-# plt.colorbar(p, label=f"Hs (m)")
-# ax.coastlines()
-# ax.set_extent([ds.lon.min() - 3, ds.lon.max() + 3, ds.lat.min() - 3, ds.lat.max() + 3])
-#
 # %% [markdown]
 # ## SWAN components
 #
@@ -379,7 +393,7 @@ project = PROJECT(
     title1="Procedural definition of a Swan config with rompy",
 )
 
-set = SET(level=0.0, depmin=0.05, direction_convention="nautical")
+swanset = SET(level=0.0, depmin=0.05, direction_convention="nautical")
 
 mode = MODE(kind="nonstationary", dim="twodimensional")
 
@@ -387,7 +401,7 @@ coordinates = COORDINATES(kind=SPHERICAL())
 
 startup = STARTUP(
     project=project,
-    set=set,
+    set=swanset,
     mode=mode,
     coordinates=coordinates,
 )
@@ -661,7 +675,7 @@ rundir = model_run()
 # %%
 modeldir = Path(model_run.output_dir) / model_run.run_id
 
-sorted(modeldir.glob("*"))
+contents = print_new_contents(modeldir, contents)
 
 # %%
 input = modeldir / "INPUT"
@@ -773,7 +787,7 @@ from rompy.backends.config import DockerConfig
 # MPI execution command for containerized SWAN
 # Running on 8 cores with 4 scribes (output processors)
 # command = f"cd /tmp/swan && mpirun --oversubscribe --allow-run-as-root -n 8 swan.exe"
-command = f"swan.exe"
+command = "swan.exe"
 
 # Create Docker configuration object
 docker_config = DockerConfig(
@@ -785,7 +799,7 @@ docker_config = DockerConfig(
     cpu=8,  # Number of CPU cores
     memory="4g",  # Memory limit
     # Execution configuration
-    executable=f'bash -c "{command}"',  # Command to run inside container
+    executable=command,  # Command to run inside container
     # Environment variables for MPI execution
     env_vars={
         "OMPI_ALLOW_RUN_AS_ROOT": "1",  # Allow root user in MPI
@@ -807,15 +821,6 @@ success = model_run.run(backend=docker_config)
 print(f"✓ Docker execution completed successfully: {success}")
 
 # %% [markdown]
-# ## Run the model
-#
-# Redirect to avoid large output
-
-# %%
-# !docker run  -v ./example_procedural/run1:/home oceanum/swan:4141 swan.exe > example_procedural/swan.log
-# !tail example_procedural/swan.log
-
-# %% [markdown]
 # ## Plot outputs
 
 # %%
@@ -831,7 +836,7 @@ from wavespectra.core.swan import read_tab
 pd.set_option("display.notebook_repr_html", False)
 
 # %%
-sorted(modeldir.glob("*"))
+contents = print_new_contents(modeldir, contents)
 
 # %%
 # Gridded output
@@ -949,3 +954,7 @@ p = ax3.scatter(dset.lon, dset.lat, s=15, c=stats.dpm, vmin=0, vmax=360, cmap="h
 plt.colorbar(p, label="Dpm (deg)")
 for ax in [ax1, ax2, ax3]:
     ax.coastlines()
+
+# %%
+
+# %%
