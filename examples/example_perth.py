@@ -17,6 +17,23 @@
 # # SWAN procedural example
 #
 # In this notebook we will use the SWAN Components and data objects to define a SWAN workspace
+# This notebook demonstrates how to configure and run a SWAN wave model simulation using the `rompy-swan` package.
+# ## Overview
+#
+# This tutorial covers:
+# - Setting up a SWAN computational grid
+# - Configuring atmospheric forcing data
+# - Setting up spectral boundary conditions
+# - Running the model using local backend
+# - Visualizing and analyzing results
+#
+# The notebook uses a procedural approach where each component is built step-by-step, providing full control over the model configuration.
+
+# %% [markdown]
+# ## Frontmatter
+#
+# This section sets up the environment and imports required packages for the SCHISM model configuration.
+#
 
 # %%
 # %load_ext autoreload
@@ -87,7 +104,7 @@ def plot_spectra(spectra, grid=None, markersize=6, ax=None):
             figsize=(10, 5), subplot_kw={"projection": ccrs.PlateCarree()}
         )
     else:
-        ax =plt.gcf().sca(ax)
+        ax = plt.gcf().sca(ax)
     if grid:
         grid.plot(ax=ax)
     c = ds.isel(time=[0]).spec.hs()
@@ -106,6 +123,7 @@ def plot_spectra(spectra, grid=None, markersize=6, ax=None):
     ax.coastlines()
     ax.grid(True)
     return ax
+
 
 def print_new_contents(path, old_contents=None):
     """
@@ -133,7 +151,6 @@ def print_new_contents(path, old_contents=None):
             print(f" - {item.name}")
     return set(item.name for item in path.iterdir())
 
-    
 
 # %% [markdown]
 # ## Workspace basepath
@@ -180,20 +197,6 @@ projection = ccrs.PlateCarree()
 
 
 # %%
-def my_fancy_interpolation(
-    dset: xr.Dataset,
-    grid: SwanGrid,
-    coords: DatasetCoords,
-    buffer: float = 0.0,
-) -> xr.Dataset:
-    """Dummy interpolation function."""
-    x0, y0, x1, y1 = grid.bbox(buffer)
-    xarr = np.arange(x0, x1 + grid.dx, grid.dx)
-    yarr = np.arange(y0, y1 + grid.dy, grid.dy)
-    return dset.interp(**{coords.x: xarr, coords.y: yarr})
-
-
-# %%
 DATADIR = Path("../tests/data")
 display(sorted(DATADIR.glob("*")))
 
@@ -223,11 +226,6 @@ gebco = xr.open_dataset(gebco_file)
 display(gebco)
 p = gebco.elevation.plot(figsize=(10, 5), cmap="terrain")
 
-# %%
-# Process gebco into the model bathy
-
-dset = my_fancy_interpolation(gebco, grid, DatasetCoords(x="lon", y="lat"), buffer=1.0)
-dset
 
 # %%
 # Create and plot the data instance. This object will be provided to the SWAN Config through the DataInterface
@@ -238,8 +236,8 @@ bottom = SwanDataGrid(
     z1="elevation",
     fac=-1,
     coords={"x": "lon", "y": "lat"},
-    crop_data=True,  # So data isn't cropped to model grid inside SwanConfig
-    buffer=2
+    crop_data=True,
+    buffer=2,
 )
 bottom.get(grid=grid, destdir=workdir)
 fig, ax = bottom.plot(
@@ -258,14 +256,6 @@ plot_nc(era5_file, "u10", timestep=0, cmap="RdBu_r", grid=grid)
 
 
 # %%
-# Process it into the model forcing
-
-dset = my_fancy_interpolation(
-    era5, grid, DatasetCoords(x="longitude", y="latitude"), buffer=1.0
-)
-dset
-
-# %%
 # ERA5 has Latitude in reverse order, use filter to reverse it
 
 from rompy.core.filters import Filter
@@ -281,7 +271,7 @@ wind = SwanDataGrid(
     coords={"x": "longitude", "y": "latitude"},
     crop_data=True,  # So data isn't cropped to model grid inside SwanConfig
     filter=Filter(sort=dict(coords=["latitude"])),
-    buffer=2
+    buffer=2,
 )
 
 wind.get(grid=grid, destdir=workdir)
@@ -954,7 +944,3 @@ p = ax3.scatter(dset.lon, dset.lat, s=15, c=stats.dpm, vmin=0, vmax=360, cmap="h
 plt.colorbar(p, label="Dpm (deg)")
 for ax in [ax1, ax2, ax3]:
     ax.coastlines()
-
-# %%
-
-# %%
